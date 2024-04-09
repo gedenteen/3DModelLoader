@@ -21,6 +21,8 @@ public class GameManager : MonoBehaviour
 
     private ListOfItems _listOfItems;
 
+    private Dictionary<string, Texture2D> _savedTextures = new Dictionary<string, Texture2D>();
+
     private async void Start()
     {
         await GetListOfItems();
@@ -131,20 +133,18 @@ public class GameManager : MonoBehaviour
             // Проверка на наличие ошибок
             if (request.result == UnityWebRequest.Result.Success)
             {
-                // Вывод ответа в консоль
-                Debug.Log("POST запрос успешно выполнен: " + request.downloadHandler.text);
+                //Debug.Log("POST запрос успешно выполнен: " + request.downloadHandler.text);
                 ListOfObjects listOfObjects = JsonConvert.DeserializeObject<ListOfObjects>(request.downloadHandler.text);
-                Debug.Log($"objectData listOfItemsFullData.objects.Count={listOfObjects.objects.Count}");
-                foreach (ObjectData objectData in listOfObjects.objects)
-                {
-                    //Debug.Log($"objectData position={objectData.transform.position} material={objectData.material}");
-                }
+                // Debug.Log($"objectData listOfItemsFullData.objects.Count={listOfObjects.objects.Count}");
+                // foreach (ObjectData objectData in listOfObjects.objects)
+                // {
+                //     Debug.Log($"objectData position={objectData.transform.position} material={objectData.material}");
+                // }
 
                 CreateModelAndTextures(id, listOfObjects);
             }
             else
             {
-                // Вывод ошибки в консоль
                 Debug.Log("Произошла ошибка при выполнении POST запроса: " + request.error);
             }
         }
@@ -190,8 +190,7 @@ public class GameManager : MonoBehaviour
 
                 // Создание и применение материала
                 Material material = new Material(Shader.Find("Standard"));
-                // Применение текстуры для материала (здесь нужно добавить код, который загружает текстуру по ссылке из объекта ObjectData)
-                StartCoroutine(GetMaterialData(material, objectData.material));
+                GetMaterialData(material, objectData.material);
                 meshRenderer.material = material;
             }
 
@@ -203,7 +202,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private IEnumerator GetMaterialData(Material material, string guid)
+    private async Task GetMaterialData(Material material, string guid)
     {
         // Создание объекта для передачи данных
         PostDataString data = new PostDataString(guid);
@@ -221,7 +220,11 @@ public class GameManager : MonoBehaviour
             www.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(jsonData));
 
             // Получение ответа
-            yield return www.SendWebRequest();
+            www.SendWebRequest();
+            while (!www.isDone)
+            {
+                await Task.Yield();
+            }
 
             // Проверка на наличие ошибок
             if (www.result == UnityWebRequest.Result.Success)
@@ -231,11 +234,17 @@ public class GameManager : MonoBehaviour
                 // Debug.Log($"materialData.basecolor={materialData.basecolor}");
 
                 if (!String.IsNullOrEmpty(materialData.basecolor))
-                    StartCoroutine(SetTexture(material, materialData.basecolor));
+                {
+                    await SetTexture(material, materialData.basecolor);
+                }
                 if (!String.IsNullOrEmpty(materialData.normal))
-                    StartCoroutine(SetTexture(material, materialData.normal, "_BumpMap")); // карта нормалей
+                {
+                    await SetTexture(material, materialData.normal, "_BumpMap"); // карта нормалей
+                }
                 if (!String.IsNullOrEmpty(materialData.roughness))
-                    StartCoroutine(SetTexture(material, materialData.roughness, "_MetallicGlossMap")); // карта шероховатостей
+                {
+                    await SetTexture(material, materialData.roughness, "_MetallicGlossMap"); // карта шероховатостей
+                }
             }
             else
             {
@@ -244,15 +253,26 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    IEnumerator SetTexture(Material material, string basecolorName)
+    private async Task SetTexture(Material material, string basecolorName)
     {
         // Отправка запроса на загрузку изображения
         string url = String.Concat(_urlGetSprite, basecolorName);
-        // Debug.Log($"TestSetMat: url={url}");
+        Debug.Log($"SetTexture: url={url}");
+
+        if (_savedTextures.ContainsKey(basecolorName))
+        {
+            Debug.Log($"SetTexture: i already have Texture with name={basecolorName}");
+            material.mainTexture = _savedTextures[basecolorName];
+            return;
+        }
 
         using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(_urlGetSprite + basecolorName))
         {
-            yield return www.SendWebRequest();
+            www.SendWebRequest();
+            while (!www.isDone)
+            {
+                await Task.Yield();
+            }
 
             if (www.result == UnityWebRequest.Result.Success)
             {
@@ -263,6 +283,8 @@ public class GameManager : MonoBehaviour
                 if (material != null)
                 {
                     material.mainTexture = texture;
+                    _savedTextures.Add(basecolorName, texture);
+                    Debug.Log($"SetTexture: saving Texture with name={basecolorName}");
                 }
                 else
                 {
@@ -276,14 +298,26 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    IEnumerator SetTexture(Material material, string textureName, string propertyName)
+    private async Task SetTexture(Material material, string textureName, string propertyName)
     {
         // Отправка запроса на загрузку изображения
         string url = String.Concat(_urlGetSprite, textureName);
-        Debug.Log($"TestSetMat: url={url}");
+        Debug.Log($"SetTexture: url={url}");
+
+        if (_savedTextures.ContainsKey(textureName))
+        {
+            Debug.Log($"SetTexture: i already have Texture with name={textureName}");
+            material.SetTexture(propertyName, _savedTextures[textureName]);
+            return;
+        }
+
         using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(url))
         {
-            yield return www.SendWebRequest();
+            www.SendWebRequest();
+            while (!www.isDone)
+            {
+                await Task.Yield();
+            }
 
             if (www.result == UnityWebRequest.Result.Success)
             {
@@ -294,6 +328,8 @@ public class GameManager : MonoBehaviour
                 if (material != null)
                 {
                     material.SetTexture(propertyName, texture);
+                    _savedTextures.Add(textureName, texture);
+                    Debug.Log($"SetTexture: saving Texture with name={textureName}");
                 }
                 else
                 {

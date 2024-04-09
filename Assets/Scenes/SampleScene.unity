@@ -1178,8 +1178,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60ea8a65f120a6b4b8d8f7330a42fbe8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  contentForButtons: {fileID: 924827378}
-  prefabButtonCreateItem: {fileID: 2531220270095280585, guid: 13c3cac0d7ed97a4eaca39d621724db1, type: 3}
+  _contentForButtons: {fileID: 924827378}
+  _prefabButtonCreateItem: {fileID: 2531220270095280585, guid: 13c3cac0d7ed97a4eaca39d621724db1, type: 3}
   _modelsManager: {fileID: 1613545630}
   _uiController: {fileID: 1207449219}
 --- !u!4 &1613545629
